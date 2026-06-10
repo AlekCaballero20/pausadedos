@@ -1,0 +1,9 @@
+{
+  "name": "Pausa de Dos",
+  "short_name": "PausaDos",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#fff7f0",
+  "theme_color": "#8b5cf6",
+  "icons": []
+}

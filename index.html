@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Pausa de Dos · Apoyo para parejas</title>
+  <meta name="description" content="Bot conversacional para acompañar conversaciones difíciles de pareja. Local, privado y sin servidores." />
+  <meta name="theme-color" content="#fff7f0" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- Encabezado compacto estilo app de mensajería -->
+    <header class="top-bar">
+      <div class="bot-identity" id="sidebarAvatar">
+        <div class="avatar-svg-wrapper">
+          <div class="avatar-aura aura-primary" id="avatarAura"></div>
+          <svg class="avatar-svg" viewBox="0 0 100 100" id="svgAvatar">
+            <circle cx="50" cy="50" r="40" fill="url(#avatarGradient)" class="face-bg" />
+            <circle cx="32" cy="55" r="4" fill="#fb7185" opacity="0.4" />
+            <circle cx="68" cy="55" r="4" fill="#fb7185" opacity="0.4" />
+            <path id="leftEye" d="M 30,46 Q 35,40 40,46" stroke="#241d2d" stroke-width="4" stroke-linecap="round" fill="none" class="eye" />
+            <path id="rightEye" d="M 60,46 Q 65,40 70,46" stroke="#241d2d" stroke-width="4" stroke-linecap="round" fill="none" class="eye" />
+            <path id="mouth" d="M 44,62 Q 50,67 56,62" stroke="#241d2d" stroke-width="3.5" stroke-linecap="round" fill="none" class="mouth" />
+            <defs>
+              <linearGradient id="avatarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#ffedd5" />
+                <stop offset="100%" stop-color="#fbcfe8" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="bot-name">
+          <h1 id="avatarName">Pau</h1>
+          <p id="avatarStatus">En línea · Un espacio seguro</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button class="icon-button" id="heatBtn" aria-label="Termómetro emocional" title="¿Cómo estás?">🌡️</button>
+        <button class="icon-button" id="openSafetyBtn" aria-label="Rutas de ayuda" title="Rutas de ayuda">🆘</button>
+        <button class="icon-button" id="menuBtn" aria-label="Más opciones" title="Más opciones">⋯</button>
+      </div>
+    </header>
+
+    <!-- Panel del termómetro (se despliega bajo el encabezado) -->
+    <section class="heat-panel" id="heatPanel" hidden>
+      <label for="heatRange">¿Qué tan intensa está la cosa ahora?</label>
+      <input id="heatRange" type="range" min="1" max="5" value="3" />
+      <p id="heatLabel" class="heat-label">3 · Hay tensión 😬</p>
+    </section>
+
+    <!-- Conversación -->
+    <main class="messages" id="messages" aria-live="polite"></main>
+
+    <!-- Respuestas rápidas -->
+    <section class="suggestion-row" id="suggestionRow"></section>
+
+    <!-- Caja de escritura -->
+    <form class="composer" id="chatForm">
+      <button type="button" class="icon-button plus" id="modesBtn" aria-label="Modos rápidos">➕</button>
+      <textarea id="userInput" rows="1" placeholder="Cuéntame qué pasa..." enterkeyhint="send"></textarea>
+      <button type="submit" class="send-button" aria-label="Enviar">➤</button>
+    </form>
+  </div>
+
+  <!-- Hoja inferior: modos rápidos -->
+  <dialog id="modesSheet" class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>¿Qué necesitas ahora?</h2>
+    <div class="mode-grid" id="modeGrid"></div>
+  </dialog>
+
+  <!-- Hoja inferior: menú -->
+  <dialog id="menuSheet" class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>Opciones</h2>
+    <div class="menu-list">
+      <button class="menu-item" id="exportBtn">📤 Exportar conversación</button>
+      <button class="menu-item danger" id="clearBtn">🧹 Borrar conversación</button>
+    </div>
+    <p class="small-print muted">Pau no es terapeuta ni reemplaza atención profesional o de emergencia. Todo queda guardado solo en este navegador: sin servidores, sin cuentas.</p>
+  </dialog>
+
+  <!-- Rutas de ayuda -->
+  <dialog id="safetyDialog" class="modal">
+    <div class="modal-header">
+      <h2>Rutas de ayuda</h2>
+      <button id="closeSafetyBtn" class="icon-button" aria-label="Cerrar">×</button>
+    </div>
+    <div class="modal-body">
+      <p><strong>Busca ayuda inmediata</strong> si hay amenaza, violencia física, coerción, miedo de estar en casa, ideas de hacerse daño o pérdida de control.</p>
+      <div class="help-grid">
+        <article>
+          <h3>🚨 Emergencias</h3>
+          <p>123 en Colombia si hay riesgo físico inmediato.</p>
+        </article>
+        <article>
+          <h3>💜 Salud mental · Bogotá</h3>
+          <p>Línea 106 y WhatsApp 300 754 8933.</p>
+        </article>
+        <article>
+          <h3>🟣 Violencia contra mujeres</h3>
+          <p>Línea 155 nacional. En Bogotá: Línea Púrpura 018000112137 y WhatsApp 300 755 1846.</p>
+        </article>
+        <article>
+          <h3>🔵 Para hombres en Bogotá</h3>
+          <p>Línea Calma 018000423614 para escucha y orientación.</p>
+        </article>
+      </div>
+      <p class="small-print">Este bot no media abusos, amenazas, vigilancia ni agresiones. Ahí la prioridad no es comunicarse mejor: es estar a salvo.</p>
+    </div>
+  </dialog>
+
+  <template id="messageTemplate">
+    <article class="message">
+      <div class="avatar"></div>
+      <div class="bubble"></div>
+    </article>
+  </template>
+
+  <script src="assets/js/knowledge-base.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+    }
+  </script>
+</body>
+</html>
