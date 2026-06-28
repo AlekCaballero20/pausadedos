@@ -19,6 +19,7 @@
     menuBtn: document.getElementById("menuBtn"),
     menuSheet: document.getElementById("menuSheet"),
     exportBtn: document.getElementById("exportBtn"),
+    exportTxtBtn: document.getElementById("exportTxtBtn"),
     clearBtn: document.getElementById("clearBtn"),
     leftEye: document.getElementById("leftEye"),
     rightEye: document.getElementById("rightEye"),
@@ -30,6 +31,9 @@
   const STORAGE_KEY = "pausaDeDos.history.v2";
   let history = loadHistory();
   let lastIntent = null; // para "ver pasos" / "frase lista"
+  let activeFlow = null;
+  let conversationContext = loadConversationContext();
+  let repairLog = loadRepairLog();
   let busy = false;
 
   /* ---------- Avatar ---------- */
@@ -207,13 +211,68 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(-120)));
   }
 
+  function loadRepairLog() {
+    try {
+      return JSON.parse(localStorage.getItem("pausaDeDos.repairLog.v1") || "[]");
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function saveRepairLog() {
+    localStorage.setItem("pausaDeDos.repairLog.v1", JSON.stringify(repairLog.slice(-80)));
+  }
+
+
+  function loadConversationContext() {
+    try {
+      return JSON.parse(localStorage.getItem("pausaDeDos.context.v1") || "{}");
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function saveConversationContext() {
+    localStorage.setItem("pausaDeDos.context.v1", JSON.stringify(conversationContext));
+  }
+
+  function rememberRepair(entry) {
+    repairLog.push({ ...entry, createdAt: new Date().toISOString(), heat: els.heatRange.value });
+    saveRepairLog();
+  }
+
   function restoreOrStart() {
     if (history.length) {
       history.forEach(item => addMessage(item.role, item.html, { persist: false, tone: item.tone }));
+      maybeFollowUp();
       renderSuggestions();
       return;
     }
     botSay(KB.opening.map(text => ({ text })), () => renderSuggestions(KB.openingChips));
+  }
+
+  // Al volver, retoma el último acuerdo si pasó más de medio día desde la última visita.
+  function maybeFollowUp() {
+    const last = repairLog[repairLog.length - 1];
+    const lastSeen = Number(localStorage.getItem("pausaDeDos.lastSeen") || 0);
+    const now = Date.now();
+    localStorage.setItem("pausaDeDos.lastSeen", String(now));
+
+    if (!last || !lastSeen || (now - lastSeen) < 12 * 60 * 60 * 1000) return;
+
+    const who = conversationContext.userName ? `${conversationContext.userName}, ` : "";
+    const what = last.agreement || last.summary || "lo que estaban trabajando";
+    window.setTimeout(() => {
+      botSay([
+        { text: `Hola de nuevo 👋 ${who}la última vez quedamos en algo:` },
+        { html: `<div class="response-card"><strong>Tu último acuerdo</strong><p>“${escapeHTML(clampText(what, 220))}”</p></div>` },
+        { text: "¿Cómo les fue con eso? Podemos ajustarlo, celebrarlo o trabajar en algo nuevo." }
+      ], () => renderSuggestions([
+        { label: "✅ Nos fue bien", prompt: "Nos fue bien con el acuerdo, quiero fortalecer la relación." },
+        { label: "⚠️ No funcionó", prompt: "El acuerdo no funcionó, necesitamos ajustarlo." },
+        { label: "🆕 Algo nuevo", prompt: "Quiero hablar de algo nuevo." }
+      ]));
+    }, 700);
   }
 
   /* ---------- Chips y modos ---------- */
@@ -235,7 +294,191 @@
   }
 
   function renderSuggestions(chips = KB.suggestions) {
-    els.suggestionRow.innerHTML = chips.slice(0, 6).map(chipHTML).join("");
+    els.suggestionRow.innerHTML = chips.slice(0, 7).map(chipHTML).join("");
+  }
+
+  function fieldCard(title, fields) {
+    return `<div class="response-card flow-card"><strong>${escapeHTML(title)}</strong><dl>${fields.map(([key, value]) => `<dt>${escapeHTML(key)}</dt><dd>${escapeHTML(value || "Pendiente")}</dd>`).join("")}</dl></div>`;
+  }
+
+  function startFlow(type) {
+    const flow = KB.flows[type];
+    if (!flow) return false;
+    activeFlow = { type, step: 0, answers: {} };
+    lastIntent = { id: type, title: flow.title, steps: flow.steps || [], phrase: flow.phrase || "" };
+    botSay([
+      { html: `<strong>${escapeHTML(flow.title)}</strong><p>${escapeHTML(flow.intro)}</p>`, text: flow.title },
+      { text: flow.questions[0].ask }
+    ], () => renderSuggestions([{ label: "Cancelar flujo", action: "cancelFlow" }]));
+    return true;
+  }
+
+  function buildFlowResult(flowState) {
+    const flow = KB.flows[flowState.type];
+    const a = flowState.answers;
+
+    if (flowState.type === "twoVoices") {
+      rememberRepair({ type: "Dos voces", summary: a.personaA || "", agreement: a.acuerdo || "" });
+      return [
+        { html: fieldCard("Mapa de dos voces", [["Persona A", a.personaA], ["Resumen de B sobre A", a.resumenB], ["Persona B", a.personaB], ["Resumen de A sobre B", a.resumenA], ["Acuerdo final", a.acuerdo]]) },
+        { text: "Clave de oro, porque parece que toca recordárselo a la especie: nadie responde hasta haber resumido al otro de forma que el otro diga 'sí, eso era'." }
+      ];
+    }
+
+    if (flowState.type === "repairMessage") {
+      const raw = a.fraseDura || "eso que dijiste/hiciste";
+      const need = a.necesidad || "cuidado y claridad";
+      const action = a.accion || "hablarlo de otra forma";
+      const soft = `Me dolió ${raw}. Me gustaría que podamos hablarlo con más cuidado, porque para mí hay una necesidad de ${need}. ¿Podemos intentar ${action}?`;
+      const clear = `Cuando pasó o dijiste: "${raw}", yo me sentí afectado/a. Necesito ${need}. Para reparar, te pido concretamente: ${action}.`;
+      const firm = `Quiero hablar de esto, pero no de cualquier manera. ${raw} me hizo daño. Puedo escuchar tu punto, y también necesito ${need}. Si vuelve a pasar, voy a pedir pausa y retomamos cuando haya respeto.`;
+      rememberRepair({ type: "Mensaje reparador", summary: raw, agreement: action });
+      return [
+        { html: `<div class="response-card phrase"><strong>Versión suave</strong><p>“${escapeHTML(soft)}”</p><button class="copy-button" type="button" data-copy="${escapeHTML(soft)}">📋 Copiar</button></div>` },
+        { html: `<div class="response-card phrase"><strong>Versión clara</strong><p>“${escapeHTML(clear)}”</p><button class="copy-button" type="button" data-copy="${escapeHTML(clear)}">📋 Copiar</button></div>` },
+        { html: `<div class="response-card phrase"><strong>Versión firme</strong><p>“${escapeHTML(firm)}”</p><button class="copy-button" type="button" data-copy="${escapeHTML(firm)}">📋 Copiar</button></div>` }
+      ];
+    }
+
+    if (flowState.type === "concreteAgreement") {
+      const agreement = `Cuando ocurra ${a.situacion || "esta situación"}, ${a.responsable || "la persona responsable"} hará ${a.conducta || "la acción acordada"}. Esto cuida la necesidad de A: ${a.necesidadA || "pendiente"}, y de B: ${a.necesidadB || "pendiente"}. Lo revisamos ${a.revision || "en una fecha acordada"}.`;
+      rememberRepair({ type: "Acuerdo concreto", summary: a.situacion || "", agreement });
+      return [
+        { html: fieldCard("Acuerdo concreto", [["Situación", a.situacion], ["Necesidad A", a.necesidadA], ["Necesidad B", a.necesidadB], ["Conducta esperada", a.conducta], ["Responsable", a.responsable], ["Revisión", a.revision]]) },
+        { html: `<div class="response-card phrase"><strong>Texto listo</strong><p>“${escapeHTML(agreement)}”</p><button class="copy-button" type="button" data-copy="${escapeHTML(agreement)}">📋 Copiar</button></div>` }
+      ];
+    }
+    return [{ text: "Flujo terminado." }];
+  }
+
+  function continueFlow(text) {
+    if (!activeFlow) return false;
+    const flow = KB.flows[activeFlow.type];
+    const current = flow.questions[activeFlow.step];
+    activeFlow.answers[current.key] = text;
+    activeFlow.step += 1;
+
+    if (activeFlow.step < flow.questions.length) {
+      const nextQuestion = flow.questions[activeFlow.step];
+      botSay([
+        { text: flowAcknowledgement(text) },
+        { text: nextQuestion.ask }
+      ], () => renderSuggestions([{ label: "Cancelar flujo", action: "cancelFlow" }]));
+      return true;
+    }
+
+    const finished = activeFlow;
+    activeFlow = null;
+    botSay(buildFlowResult(finished), () => renderSuggestions([
+      { label: "🧾 Exportar bitácora", action: "exportTxt" },
+      { label: "🤝 Otro acuerdo", prompt: "Ayúdanos a convertir este problema en un acuerdo concreto." },
+      { label: "🪡 Mensaje reparador", prompt: "Quiero transformar una frase dura en un mensaje reparador." }
+    ]));
+    return true;
+  }
+
+  /* ---------- Capa conversacional (small talk) ---------- */
+
+  function pick(list) {
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  function timeGreeting(simple = false) {
+    const h = new Date().getHours();
+    if (simple) return h < 12 ? "Buen día." : h < 19 ? "Buena tarde." : "Buena noche.";
+    return h < 12 ? "Buenos días ☀️" : h < 19 ? "Buenas tardes 🌤️" : "Buenas noches 🌙";
+  }
+
+  function farewellByTime() {
+    const h = new Date().getHours();
+    return h >= 19 || h < 5 ? "Que descanses 🌙" : "Que te vaya bonito.";
+  }
+
+  function fillTokens(text) {
+    return text
+      .replace(/\{saludo_simple\}/g, timeGreeting(true))
+      .replace(/\{saludo\}/g, timeGreeting(false))
+      .replace(/\{despedida\}/g, farewellByTime());
+  }
+
+  // Detecta charla conversacional. Devuelve la categoría o null.
+  function detectSmalltalk(text) {
+    const clean = normalize(text);
+    if (!clean) return null;
+    const wordCount = clean.split(" ").length;
+
+    let best = null;
+    let bestScore = 0;
+    for (const cat of (KB.smalltalk || [])) {
+      // Categorías "shortOnly" (sí/no/ok) solo si el mensaje es muy corto.
+      if (cat.shortOnly && wordCount > 2) continue;
+      for (const kw of cat.keywords) {
+        const key = normalize(kw);
+        if (!key) continue;
+        // Coincidencia como palabra/frase completa, no como subcadena suelta.
+        const re = new RegExp(`(^|\\s)${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|\\s)`);
+        if (re.test(clean)) {
+          // Frases más largas pesan más (más específicas).
+          const score = key.length + (key.includes(" ") ? 5 : 0);
+          if (score > bestScore) { bestScore = score; best = cat; }
+        }
+      }
+    }
+
+    // Para frases largas, exigimos que el small talk no sea trivial:
+    // un "hola, acabamos de pelear" debe ir al motor de intenciones.
+    if (best && wordCount > 6 && best.id !== "botFrustration" && best.id !== "ventOnly" && best.id !== "smallNeg") {
+      // Si además hay señales de un tema real, dejamos pasar al motor.
+      const hasTopic = KB.intents.some(i => i.keywords.some(k => clean.includes(normalize(k))));
+      if (hasTopic) return null;
+    }
+    return best;
+  }
+
+  function handleSmalltalk(cat) {
+    lastIntent = null;
+    let reply = pick(cat.replies).map(line => ({ text: fillTokens(line) }));
+    // Personaliza el saludo si ya conocemos el nombre.
+    if (cat.id === "greeting" && conversationContext.userName && reply[0]) {
+      reply[0].text = reply[0].text.replace(/Soy Pau[^.]*\./, `Soy Pau. Qué bueno verte de nuevo, ${conversationContext.userName} 💛`);
+    }
+    const chips = (cat.chips && cat.chips.length) ? cat.chips : KB.suggestions;
+    botSay(reply, () => renderSuggestions(chips));
+  }
+
+  /* ---------- Memoria de nombres ---------- */
+
+  function cleanName(raw) {
+    if (!raw) return "";
+    const word = raw.trim().split(/\s+/)[0];
+    if (word.length < 2 || word.length > 18) return "";
+    // Evita falsos positivos comunes ("soy feliz", "soy tonto", etc.).
+    const stop = ["feliz", "triste", "tonto", "tonta", "bobo", "boba", "un", "una", "el", "la", "muy", "tan", "mas", "menos", "yo", "asi", "asi"];
+    if (stop.includes(normalize(word))) return "";
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  }
+
+  // Detecta y guarda nombres del usuario y de su pareja. Devuelve un saludo si recién se presentó.
+  function detectNames(text) {
+    const clean = normalize(text);
+    let learnedUser = false;
+
+    const partnerMatch = text.match(/(?:mi pareja|mi novi[oa]|mi espos[oa]|mi marido|mi mujer|el?\s|ella\s)?\s*se llama\s+([A-Za-zÁÉÍÓÚáéíóúñÑ]+)/i);
+    if (partnerMatch && /pareja|novi|espos|marido|mujer/i.test(text)) {
+      const name = cleanName(partnerMatch[1]);
+      if (name) { conversationContext.partnerName = name; saveConversationContext(); }
+    }
+
+    const userMatch = text.match(/(?:me llamo|mi nombre es|soy)\s+([A-Za-zÁÉÍÓÚáéíóúñÑ]+)/i);
+    if (userMatch && !/pareja|novi|espos|marido|mujer|el que|la que/i.test(text)) {
+      const name = cleanName(userMatch[1]);
+      if (name && name !== conversationContext.userName) {
+        conversationContext.userName = name;
+        saveConversationContext();
+        learnedUser = true;
+      }
+    }
+    return learnedUser;
   }
 
   /* ---------- Motor de intención ---------- */
@@ -290,7 +533,153 @@
     return notes;
   }
 
+  function clampText(text, max = 110) {
+    const clean = (text || "").replace(/\s+/g, " ").trim();
+    if (clean.length <= max) return clean;
+    return clean.slice(0, max - 1).trim() + "…";
+  }
+
+  function sentenceLike(text) {
+    const first = (text || "").split(/[.!?\n]/).map(x => x.trim()).find(Boolean) || text;
+    return clampText(first, 120);
+  }
+
+  function includesAny(clean, words) {
+    return words.some(word => clean.includes(normalize(word)));
+  }
+
+  function inferNeed(clean) {
+    const map = [
+      { need: "seguridad", words: ["miedo", "amenaza", "agres", "control", "celos", "desconfianza", "mentira"] },
+      { need: "validación", words: ["no es para tanto", "exager", "calmate", "cálmate", "no me entiende", "me minimiza", "loca", "loco"] },
+      { need: "claridad", words: ["confuso", "no entiendo", "qué quiere", "que quiere", "dudas", "explicar", "aclarar"] },
+      { need: "respeto", words: ["insulto", "grito", "burla", "sarcasmo", "humill", "me habló feo", "me hablo feo"] },
+      { need: "conexión", words: ["distancia", "frío", "fria", "fría", "frio", "solo", "sola", "no me habla", "se aleja"] },
+      { need: "espacio", words: ["me agobia", "asfixia", "espacio", "me satura", "me presiona"] },
+      { need: "reparación", words: ["perdón", "perdon", "disculpa", "reparar", "la embarr", "me equivoqué", "me equivoque"] },
+      { need: "acuerdo práctico", words: ["tareas", "plata", "dinero", "responsabilidad", "horarios", "familia", "decidir", "acuerdo"] }
+    ];
+    const hit = map.find(item => includesAny(clean, item.words));
+    return hit ? hit.need : "ser escuchado/a sin que esto escale";
+  }
+
+  function inferTask(clean, intentId) {
+    if (includesAny(clean, ["cómo le digo", "como le digo", "quiero decir", "mensaje", "responder", "whatsapp", "traducir"]) || intentId === "translate") return "armar una respuesta";
+    if (includesAny(clean, ["calmar", "pausa", "ansiedad", "respirar", "no quiero pelear"]) || intentId === "pause" || intentId === "calmGuide") return "bajar la intensidad";
+    if (includesAny(clean, ["acuerdo", "que no se repita", "reglas", "pacto", "organizar"]) || intentId === "chores" || intentId === "money" || intentId === "decision") return "convertirlo en un acuerdo";
+    if (includesAny(clean, ["por qué", "porque", "no entiendo", "qué hay detrás", "que hay detras", "entender"]) || intentId === "needs") return "entender qué hay debajo";
+    if (includesAny(clean, ["perdón", "perdon", "disculpa", "reparar", "arreglar"]) || intentId === "repair") return "reparar el daño";
+    return "ubicar el problema antes de responder";
+  }
+
+  function extractMoment(text, intent, heat) {
+    const clean = normalize(text);
+    const feeling = detectFeeling(clean);
+    const need = inferNeed(clean);
+    const task = inferTask(clean, intent.id);
+    const topic = sentenceLike(text);
+    const absolutes = detectAbsolutes(clean);
+    const directAsk = includesAny(clean, ["dame", "hazme", "ayúdame", "ayudame", "cómo", "como", "quiero", "necesito"]);
+    return { clean, feeling, need, task, topic, heat: Number(heat), absolutes, directAsk };
+  }
+
+  function updateConversationContext(moment, intent) {
+    conversationContext.turns = (conversationContext.turns || 0) + 1;
+    conversationContext.lastTopic = moment.topic;
+    conversationContext.lastNeed = moment.need;
+    conversationContext.lastTask = moment.task;
+    conversationContext.lastIntentId = intent.id;
+    conversationContext.lastHeat = moment.heat;
+    saveConversationContext();
+  }
+
+  function groundedOpening(moment, intent) {
+    const opener = [];
+    if (moment.heat >= 5) {
+      opener.push({ text: `Esto suena demasiado cargado para resolverlo en caliente. Primero bajemos intensidad; después sí miramos el tema.` });
+      return opener;
+    }
+
+    if (conversationContext.turns > 1 && conversationContext.lastTopic && conversationContext.lastTopic !== moment.topic) {
+      opener.push({ text: `Vengo siguiendo el hilo: antes estábamos en "${conversationContext.lastTopic}" y ahora aparece esto: "${moment.topic}".` });
+    } else {
+      opener.push({ text: pick([
+        `Lo que entiendo de tu caso es esto: "${moment.topic}".`,
+        `A ver si te sigo bien: "${moment.topic}".`,
+        `Te leo. Lo que capto es: "${moment.topic}".`
+      ]) });
+    }
+
+    const needText = moment.feeling
+      ? pick([
+          `Debajo alcanzo a leer ${moment.feeling} y una necesidad de ${moment.need}.`,
+          `Por debajo se siente ${moment.feeling}, y una necesidad de ${moment.need}.`
+        ])
+      : pick([
+          `Debajo parece haber una necesidad de ${moment.need}.`,
+          `Y creo que el fondo de esto es una necesidad de ${moment.need}.`
+        ]);
+    opener.push({ text: needText });
+
+    if (moment.absolutes.length) {
+      opener.push({ text: `También noto palabras absolutas como ${moment.absolutes.map(w => `"${w}"`).join(", ")}. A veces son verdad emocional, pero suelen prender la defensa del otro lado.` });
+    }
+
+    if (intent.id !== "fallback") {
+      opener.push({ text: `Entonces no lo trataría como "tema genérico de ${intent.title.toLowerCase()}". Lo trabajaría como: ${moment.task}.` });
+    }
+    return opener;
+  }
+
+  function actionQuestion(moment) {
+    if (moment.task === "armar una respuesta") return "Pégame la frase cruda o dime exactamente qué quieres decir, y te la devuelvo en versión cuidadosa, clara y firme.";
+    if (moment.task === "bajar la intensidad") return "Antes de hablar con tu pareja: ¿quieres una pausa guiada de 2 minutos o una frase corta para pedir espacio sin sonar a abandono?";
+    if (moment.task === "convertirlo en un acuerdo") return "Para volverlo acuerdo necesito una conducta observable: ¿qué tendría que pasar distinto la próxima vez?";
+    if (moment.task === "reparar el daño") return "Para reparar bien: ¿qué parte sí reconoces como tuya y qué impacto tuvo en la otra persona?";
+    if (moment.task === "entender qué hay debajo") return "Dime una escena concreta: ¿qué pasó, qué sentiste y qué fue lo que más te dolió de eso?";
+    return "Para no adivinar como aplicación mediocre: ¿quieres que primero entendamos qué hay debajo, que armemos una respuesta, o que lo convirtamos en acuerdo?";
+  }
+
+  function progressiveIntentBubbles(intent, moment) {
+    if (!intent.bubbles?.length) return [];
+    const max = moment.directAsk ? 2 : 1;
+    return intent.bubbles.slice(0, max).map(b => ({ text: b }));
+  }
+
+  function contextChips(intent, moment) {
+    const chips = [];
+    chips.push({ label: "🎯 Afinar mi caso", prompt: `El detalle importante es: ` });
+    if (moment.task !== "armar una respuesta") chips.push({ label: "📝 Armar respuesta", prompt: "Quiero decir esto sin herir: " });
+    if (moment.task !== "convertirlo en un acuerdo") chips.push({ label: "🤝 Convertir en acuerdo", prompt: "Ayúdanos a convertir este problema en un acuerdo concreto." });
+    if (intent.bubbles?.length > 2) chips.push({ label: "📚 Ver explicación", action: "more" });
+    return [...chips, ...intentChips(intent)].slice(0, 7);
+  }
+
+  function showMore() {
+    if (!lastIntent?.moreBubbles?.length) return;
+    botSay(lastIntent.moreBubbles.map(text => ({ text })), () => renderSuggestions(intentChips(lastIntent)));
+  }
+
+  function flowAcknowledgement(text) {
+    const clean = normalize(text);
+    const feeling = detectFeeling(clean);
+    if (includesAny(clean, ["no sé", "no se", "ni idea", "no estoy seguro", "no estoy segura"])) {
+      return "Sirve decir “no sé”. No es elegante, pero al menos es honesto. Vamos con una versión aproximada.";
+    }
+    if (feeling) return `Tiene sentido que aparezca ${feeling}. Lo tomo como dato importante, no como exageración.`;
+    if (text.length > 80) return "Gracias, eso ya da más contexto. Voy guardando lo importante.";
+    return "Te sigo.";
+  }
+
   /* ---------- Respuesta ---------- */
+
+  function startFlowFromText(text) {
+    const clean = normalize(text);
+    if (clean.includes("dos voces") || clean.includes("cada uno dice")) return startFlow("twoVoices");
+    if (clean.includes("frase dura") || clean.includes("mensaje reparador") || clean.includes("traducir") || clean.includes("sin herir")) return startFlow("repairMessage");
+    if (clean.includes("acuerdo concreto") || clean.includes("crear acuerdo") || clean.includes("convertir este problema en un acuerdo")) return startFlow("concreteAgreement");
+    return false;
+  }
 
   function intentChips(intent) {
     const chips = [];
@@ -302,6 +691,27 @@
 
   function respond(text) {
     const heat = Number(els.heatRange.value);
+
+    if (startFlowFromText(text)) return;
+
+    // La seguridad siempre primero: una crisis nunca se trata como small talk.
+    if (!hasCrisis(normalize(text))) {
+      const learnedUser = detectNames(text);
+      const small = detectSmalltalk(text);
+
+      // Si solo se presentó ("me llamo Ana"), responde con calidez y sigue.
+      if (learnedUser && (!small || small.id === "greeting") && normalize(text).split(" ").length <= 6) {
+        lastIntent = null;
+        botSay([
+          { text: `¡Mucho gusto, ${conversationContext.userName}! 💛 Me alegra tenerte por aquí.` },
+          { text: "¿Qué te trae hoy? Cuéntame qué pasó o qué te gustaría lograr." }
+        ], () => renderSuggestions(["Acabamos de pelear 😮‍💨", "Quiero responder sin herir", "Solo quiero desahogarme"]));
+        return;
+      }
+
+      if (small) { handleSmalltalk(small); return; }
+    }
+
     const result = chooseIntent(text, heat);
 
     if (result.type === "crisis") {
@@ -323,18 +733,17 @@
     }
 
     const intent = result.data;
-    lastIntent = intent;
-
-    const reflection = makeReflection(text)
-      .filter(note => intent.id !== "fallback" || note) // siempre válidas
-      .map(note => ({ text: note }));
+    const moment = extractMoment(text, intent, heat);
+    updateConversationContext(moment, intent);
+    lastIntent = { ...intent, moreBubbles: (intent.bubbles || []).slice(moment.directAsk ? 2 : 1) };
 
     const parts = [
-      ...(intent.id === "fallback" ? [] : reflection.slice(0, 1)),
-      ...intent.bubbles.map(b => ({ text: b }))
+      ...groundedOpening(moment, intent),
+      ...progressiveIntentBubbles(intent, moment),
+      { text: actionQuestion(moment) }
     ];
 
-    botSay(parts, () => renderSuggestions(intentChips(intent)));
+    botSay(parts, () => renderSuggestions(contextChips(lastIntent, moment)));
   }
 
   function showSteps() {
@@ -370,6 +779,7 @@
     const clean = normalize(text);
     if (hasCrisis(clean)) updateAvatar(5);
 
+    if (continueFlow(text)) return;
     respond(text);
   }
 
@@ -377,7 +787,7 @@
     if (busy) return;
     addMessage("user", `<p>${escapeHTML(prompt)}</p>`);
     els.suggestionRow.innerHTML = "";
-    respond(prompt);
+    if (!startFlowFromText(prompt)) respond(prompt);
   }
 
   function autosizeTextarea() {
@@ -387,12 +797,39 @@
 
   /* ---------- Exportar / limpiar ---------- */
 
+  function exportTextLog() {
+    const lines = [
+      "PAUSA DE DOS - BITÁCORA DE REPARACIÓN",
+      `Exportado: ${new Date().toLocaleString()}`,
+      "",
+      ...repairLog.flatMap((entry, index) => [
+        `#${index + 1} · ${entry.type || "Registro"}`,
+        `Fecha: ${entry.createdAt || ""}`,
+        `Resumen: ${entry.summary || ""}`,
+        `Acuerdo / acción: ${entry.agreement || ""}`,
+        `Intensidad: ${entry.heat || ""}`,
+        ""
+      ])
+    ];
+    const content = repairLog.length ? lines.join("\n") : "PAUSA DE DOS - BITÁCORA DE REPARACIÓN\nAún no hay acuerdos o reparaciones guardadas.";
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `bitacora-pausa-de-dos-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
   function exportHistory() {
     const payload = {
       app: KB.appName,
       exportedAt: new Date().toISOString(),
       heat: els.heatRange.value,
-      history
+      history,
+      repairLog
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -411,6 +848,8 @@
     history = [];
     lastIntent = null;
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem("pausaDeDos.context.v1");
+    conversationContext = {};
     els.messages.innerHTML = "";
     els.menuSheet.close();
     restoreOrStart();
@@ -448,7 +887,10 @@
       const action = button.getAttribute("data-action");
       if (action === "steps") { showSteps(); return; }
       if (action === "phrase") { showPhrase(); return; }
+      if (action === "more") { showMore(); return; }
       if (action === "safety") { els.safetyDialog.showModal(); return; }
+      if (action === "cancelFlow") { activeFlow = null; botSay([{ text: "Listo, cancelé el flujo. Volvemos al modo conversación." }], () => renderSuggestions()); return; }
+      if (action === "exportTxt") { exportTextLog(); return; }
 
       const prompt = button.getAttribute("data-prompt");
       if (!prompt) return;
@@ -497,6 +939,7 @@
     els.openSafetyBtn.addEventListener("click", () => els.safetyDialog.showModal());
     els.closeSafetyBtn.addEventListener("click", () => els.safetyDialog.close());
     els.exportBtn.addEventListener("click", exportHistory);
+    if (els.exportTxtBtn) els.exportTxtBtn.addEventListener("click", exportTextLog);
     els.clearBtn.addEventListener("click", clearHistory);
   }
 

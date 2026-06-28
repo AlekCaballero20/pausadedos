@@ -10,14 +10,14 @@ window.COUPLES_KB = {
 
   opening: [
     "Hola 👋 Soy Pau.",
-    "Estoy aquí para ayudarte cuando con tu pareja no saben cómo resolver algo: una pelea, un mensaje difícil, una distancia rara.",
-    "Cuéntame en una frase qué está pasando. O toca el botón ➕ para ver los modos rápidos."
+    "No necesitas resumir perfecto. Escríbeme como te salga: qué pasó, qué sentiste y qué necesitas ahora.",
+    "Yo primero voy a intentar entender el momento concreto; después vemos si conviene calmar, responder, reparar o acordar."
   ],
 
   openingChips: [
     "Acabamos de pelear 😮‍💨",
     "Quiero responder sin herir",
-    "Siento distancia entre nosotros",
+    "No sé qué hay debajo de esto",
     "Necesito calmarme primero"
   ],
 
@@ -25,8 +25,9 @@ window.COUPLES_KB = {
     "Acabamos de pelear 😮‍💨",
     "Ayúdame a responder sin herir",
     "Quiero entender qué hay detrás",
+    "El detalle importante es:",
     "Hagamos un acuerdo concreto",
-    "Siento distancia entre nosotros"
+    "Necesito calmarme primero"
   ],
 
   heatLabels: {
@@ -562,6 +563,61 @@ window.COUPLES_KB = {
     }
   ],
 
+
+  flows: {
+    twoVoices: {
+      title: "Modo Dos voces",
+      intro: "Vamos por turnos. La regla es simple: primero entender, luego responder. Una proeza para mamíferos con orgullo, sí, pero funciona.",
+      questions: [
+        { key: "personaA", ask: "Persona A: escribe en 3 líneas el hecho, la emoción y la necesidad. Sin diagnóstico del otro, por favor, que no estamos emitiendo sentencias." },
+        { key: "resumenB", ask: "Persona B: resume lo que entendiste de A. Empieza con: 'Lo que entiendo es...'" },
+        { key: "personaB", ask: "Ahora Persona B: escribe tu hecho, emoción y necesidad." },
+        { key: "resumenA", ask: "Persona A: resume lo que entendiste de B. Sin corregir todavía, modo espejo." },
+        { key: "acuerdo", ask: "Entre los dos: ¿qué acuerdo pequeño y concreto quieren intentar desde hoy?" }
+      ],
+      steps: [
+        "Persona A habla desde hecho, interpretación, emoción y necesidad.",
+        "Persona B resume antes de responder.",
+        "Persona B habla desde hecho, interpretación, emoción y necesidad.",
+        "Persona A resume antes de responder.",
+        "Cierran con una acción concreta y fecha de revisión."
+      ]
+    },
+    repairMessage: {
+      title: "Mensaje reparador",
+      intro: "Pegas la frase dura o cuentas qué dolió, y la convertimos en tres versiones: suave, clara y firme.",
+      questions: [
+        { key: "fraseDura", ask: "Pega la frase dura, el reclamo o la situación que quieres reparar." },
+        { key: "necesidad", ask: "¿Qué necesidad quieres proteger? Puede ser claridad, respeto, descanso, seguridad, conexión, autonomía, reconocimiento o justicia." },
+        { key: "accion", ask: "¿Qué acción concreta quisieras pedir para la próxima vez?" }
+      ],
+      steps: [
+        "Reconoce impacto sin justificarte.",
+        "Nombra la necesidad protegida.",
+        "Pide una acción concreta, observable y posible.",
+        "Evita: 'perdón si te sentiste así'. Eso no repara, eso echa humo bonito."
+      ]
+    },
+    concreteAgreement: {
+      title: "Acuerdo concreto",
+      intro: "Vamos a bajar esto de la nube emocional a tierra firme: situación, necesidades, conducta, responsable y revisión.",
+      questions: [
+        { key: "situacion", ask: "¿Cuál es la situación específica que quieren ordenar? Ejemplo: llegadas tarde, mensajes, familia, dinero, cansancio, tareas, trabajo compartido." },
+        { key: "necesidadA", ask: "Necesidad de la Persona A: ¿qué intenta proteger?" },
+        { key: "necesidadB", ask: "Necesidad de la Persona B: ¿qué intenta proteger?" },
+        { key: "conducta", ask: "¿Qué conducta observable esperan? Algo que se pueda ver o medir, no 'ser más considerado', que suena precioso y sirve poquito." },
+        { key: "responsable", ask: "¿Quién hace qué? Puede ser una persona o ambos con acciones distintas." },
+        { key: "revision", ask: "¿Cuándo revisan si funcionó? Ejemplo: domingo en la noche, en 7 días, después del evento." }
+      ],
+      steps: [
+        "Separar hecho, interpretación, emoción y necesidad.",
+        "Traducir la necesidad en conducta concreta.",
+        "Asignar responsable y momento.",
+        "Revisar sin castigar: ajustar es parte del acuerdo."
+      ]
+    }
+  },
+
   fallback: {
     id: "fallback",
     title: "Vamos a ordenar esto",
@@ -597,5 +653,117 @@ window.COUPLES_KB = {
   },
 
   feelingWords: ["rabia", "tristeza", "miedo", "ansiedad", "culpa", "vergüenza", "soledad", "frustración", "agotamiento", "confusión", "dolor", "inseguridad", "ternura", "celos"],
-  needWords: ["claridad", "seguridad", "respeto", "descanso", "apoyo", "autonomía", "cariño", "presencia", "reconocimiento", "orden", "justicia", "confianza", "tiempo", "calma", "cuidado"]
+  needWords: ["claridad", "seguridad", "respeto", "descanso", "apoyo", "autonomía", "cariño", "presencia", "reconocimiento", "orden", "justicia", "confianza", "tiempo", "calma", "cuidado"],
+
+  // ---------- Capa conversacional (small talk) ----------
+  // Se evalúa ANTES del motor de intenciones para que el bot reconozca
+  // saludos, despedidas, agradecimientos, etc. y se sienta como una conversación.
+  // Cada categoría: keywords (exactas, frases cortas), match opcional (regex),
+  // y replies (variantes que se eligen al azar para que no suene a robot).
+  smalltalk: [
+    {
+      id: "greeting",
+      keywords: ["hola", "holi", "holaa", "buenas", "ola", "hey", "ey", "que tal", "qué tal", "saludos", "como estas", "cómo estás", "como estan", "cómo están", "que mas", "qué más", "quiubo", "qiubo", "hello", "hi"],
+      // Variantes con {saludo} que se reemplaza por buenos días/tardes/noches.
+      replies: [
+        ["{saludo} 👋 Soy Pau, tu acompañante para hablar mejor en pareja.", "¿Cómo vienes hoy? Cuéntame qué pasó o qué necesitas, como te salga."],
+        ["¡Hola! {saludo_simple} Me alegra que estés aquí 🙂", "¿Qué te trae hoy? ¿Algo que acaba de pasar, algo que quieres decir mejor, o solo necesitas ordenar la cabeza?"],
+        ["{saludo} Aquí estoy 💛", "No tienes que explicarlo perfecto. Dime qué pasó, qué sentiste o qué te gustaría lograr."]
+      ],
+      chips: ["Acabamos de pelear 😮‍💨", "Quiero responder sin herir", "Solo quiero desahogarme", "¿Qué puedes hacer?"]
+    },
+    {
+      id: "howAreYou",
+      keywords: ["como estas", "cómo estás", "como te va", "cómo te va", "como andas", "cómo andas", "todo bien", "que haces", "qué haces"],
+      replies: [
+        ["Yo siempre listo y con paciencia infinita, que para eso fui hecho 🙂", "Pero lo importante eres tú: ¿cómo estás tú hoy?"]
+      ],
+      chips: ["Estoy bien, solo curioseo", "La verdad, mal 😔", "Estresado/a", "Acabamos de pelear"]
+    },
+    {
+      id: "identity",
+      keywords: ["quien eres", "quién eres", "como te llamas", "cómo te llamas", "que eres", "qué eres", "eres un bot", "eres real", "eres una persona", "eres humano", "eres ia", "eres una ia", "tu nombre"],
+      replies: [
+        ["Soy Pau, un asistente para conversaciones de pareja 🤖💛 No soy humano ni terapeuta: soy una herramienta para ayudarte a calmar, entender, responder y acordar.", "Lo que me cuentes se queda en tu navegador, no lo ve nadie más. ¿En qué te ayudo hoy?"]
+      ],
+      chips: ["¿Qué puedes hacer?", "Quiero responder sin herir", "Acabamos de pelear"]
+    },
+    {
+      id: "capabilities",
+      keywords: ["que puedes hacer", "qué puedes hacer", "para que sirves", "para qué sirves", "como funcionas", "cómo funcionas", "que sabes hacer", "qué sabes hacer", "ayuda", "como me ayudas", "cómo me ayudas", "opciones", "menu", "menú"],
+      replies: [
+        ["Te acompaño en cuatro cosas, según el momento 👇", "🫧 Calmarte antes de hablar · 📝 Traducir lo que quieres decir sin herir · 🪡 Reparar después de una pelea · 🤝 Convertir el problema en un acuerdo concreto.", "También puedo escucharte, ayudarte a entender qué hay debajo y guiar a los dos por turnos. ¿Por dónde empezamos?"]
+      ],
+      chips: ["🫧 Calmarme", "📝 Traducir un mensaje", "🪡 Reparar una pelea", "🤝 Hacer un acuerdo"]
+    },
+    {
+      id: "thanks",
+      keywords: ["gracias", "muchas gracias", "mil gracias", "te lo agradezco", "thank you", "thanks", "agradecido", "agradecida", "me sirvió", "me sirvio", "me ayudaste", "buenísimo", "buenisimo", "genial", "excelente", "perfecto"],
+      replies: [
+        ["Con gusto 💛 Para eso estoy.", "¿Quieres seguir con otra cosa o lo dejamos aquí por hoy?"],
+        ["Me alegra haber ayudado 🙂", "Si en algún momento se vuelve a poner difícil, aquí estaré."]
+      ],
+      chips: ["Seguir con otro tema", "Hacer un acuerdo concreto", "Por hoy está bien 👋"]
+    },
+    {
+      id: "farewell",
+      keywords: ["adios", "adiós", "chao", "chau", "bye", "nos vemos", "hasta luego", "hasta pronto", "me voy", "buenas noches me voy", "hasta mañana", "hasta manana", "me despido", "gracias adios"],
+      replies: [
+        ["Cuídate mucho 💛 Hablar con cuidado ya es un montón, así que bien por ti.", "Aquí sigo cuando me necesites. {despedida}"],
+        ["{despedida} 👋 Recuerda: las parejas que duran no son las que no pelean, son las que reparan.", "Vuelve cuando quieras."]
+      ],
+      chips: []
+    },
+    {
+      id: "affirm",
+      keywords: ["si", "sí", "claro", "dale", "ok", "okay", "vale", "bueno", "esta bien", "está bien", "de acuerdo", "hagamoslo", "hagámoslo", "porfa", "por favor", "sip", "obvio", "listo"],
+      // Solo aplica cuando el mensaje es MUY corto (confirmación). Lo controla app.js.
+      shortOnly: true,
+      replies: [
+        ["¡Perfecto! 🙂 Cuéntame entonces: ¿qué pasó o qué te gustaría decir?"]
+      ],
+      chips: ["Acabamos de pelear", "Quiero traducir un mensaje", "Necesito calmarme"]
+    },
+    {
+      id: "deny",
+      keywords: ["no", "nop", "no se", "no sé", "ni idea", "nada", "no quiero", "no gracias", "ahora no"],
+      shortOnly: true,
+      replies: [
+        ["Sin problema 🙂 No hay que tener todo claro para empezar.", "Si quieres, escoge algo de abajo o solo escribe lo primero que se te venga a la cabeza."]
+      ],
+      chips: ["No sé por dónde empezar", "Solo quiero desahogarme", "¿Qué puedes hacer?"]
+    },
+    {
+      id: "ventOnly",
+      keywords: ["solo quiero desahogarme", "solo desahogarme", "necesito desahogarme", "solo escuchame", "solo escúchame", "no quiero consejos", "solo quiero hablar", "solo necesito hablar", "no me des soluciones"],
+      replies: [
+        ["Claro. A veces uno no necesita soluciones, necesita que lo escuchen 💛", "Aquí no te voy a apurar ni a corregir. Cuéntame todo lo que necesites soltar, con calma.", "Y cuando quieras, me dices si prefieres que te dé una mano para responder o lo dejamos en desahogo."]
+      ],
+      chips: ["Quiero contar qué pasó", "Ya, ahora ayúdame a responder", "Necesito calmarme"]
+    },
+    {
+      id: "botFrustration",
+      keywords: ["no me entiendes", "no sirves", "no entiendes nada", "eres inutil", "eres inútil", "no me ayudas", "responde bien", "que tonto", "qué tonto", "estupido", "estúpido", "no es lo que pregunte", "no es lo que pregunté", "mala respuesta"],
+      replies: [
+        ["Tienes razón en reclamar, y te pido disculpas 🙏 No quiero darte respuestas que no encajan.", "Ayúdame a afinar: ¿qué es exactamente lo que necesitas ahora mismo? Por ejemplo: calmarte, decir algo sin herir, entender algo, o llegar a un acuerdo."]
+      ],
+      chips: ["Quiero calmarme", "Ayúdame a responder", "Quiero entender qué pasó", "Hacer un acuerdo"]
+    },
+    {
+      id: "compliment",
+      keywords: ["te quiero", "eres lo mejor", "me caes bien", "eres genial pau", "buen bot", "muy bueno", "me encanta esto", "que lindo", "qué lindo", "eres tierno"],
+      replies: [
+        ["Aww, gracias 💛 Me hace bien (en lo que un asistente puede sentirse bien, je).", "Lo importante es que tú estés mejor. ¿Seguimos?"]
+      ],
+      chips: ["Sí, sigamos", "Por hoy está bien 👋"]
+    },
+    {
+      id: "smallNeg",
+      keywords: ["estoy mal", "me siento mal", "estoy triste", "estoy fatal", "estoy destrozado", "estoy destrozada", "no estoy bien", "me siento solo", "me siento sola", "ando mal", "estoy agotado", "estoy agotada", "estoy cansado", "estoy cansada"],
+      replies: [
+        ["Lamento que estés así 💛 Gracias por decirlo, no es poca cosa.", "Estoy aquí contigo. ¿Quieres contarme qué está pasando, o prefieres que primero te ayude a respirar y bajar un poco el peso?"]
+      ],
+      chips: ["Contarte qué pasó", "Necesito calmarme primero", "Solo quiero desahogarme"]
+    }
+  ]
 };

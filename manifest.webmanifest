@@ -5,5 +5,8 @@
   "display": "standalone",
   "background_color": "#fff7f0",
   "theme_color": "#8b5cf6",
+  "orientation": "portrait",
+  "scope": "./",
+  "description": "Bot local para ordenar conversaciones difíciles de pareja con rutas de seguridad.",
   "icons": []
 }

@@ -110,3 +110,15 @@ Ahí puedes editar:
 - Plantillas de reparación.
 - Rutas de ayuda.
 
+
+## Ajuste v2: conversación más situada
+
+Esta versión mejora el problema de que Pau sonaba como un menú de respuestas. El cambio central está en `assets/js/app.js`:
+
+- Guarda un contexto mínimo de la conversación: último tema, necesidad probable, tarea actual e intensidad.
+- Antes de soltar teoría, devuelve una lectura del caso concreto que la persona escribió.
+- Distingue mejor la intención práctica: calmar, responder, reparar, entender o acordar.
+- Muestra menos explicación al inicio y deja el contenido largo detrás del botón `📚 Ver explicación`.
+- En flujos guiados, responde con una validación breve antes de pasar a la siguiente pregunta.
+
+Esto sigue siendo un motor local sin IA real. Por eso no “entiende” como un modelo generativo, pero se siente menos rígido porque ya no responde solo por palabra clave: primero intenta situar el momento.

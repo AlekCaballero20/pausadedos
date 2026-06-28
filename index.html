@@ -52,7 +52,7 @@
     </section>
 
     <!-- Conversación -->
-    <main class="messages" id="messages" aria-live="polite"></main>
+    <main class="messages" id="messages" aria-live="polite" aria-label="Conversación con Pau"></main>
 
     <!-- Respuestas rápidas -->
     <section class="suggestion-row" id="suggestionRow"></section>
@@ -60,7 +60,8 @@
     <!-- Caja de escritura -->
     <form class="composer" id="chatForm">
       <button type="button" class="icon-button plus" id="modesBtn" aria-label="Modos rápidos">➕</button>
-      <textarea id="userInput" rows="1" placeholder="Cuéntame qué pasa..." enterkeyhint="send"></textarea>
+      <label class="sr-only" for="userInput">Mensaje para Pau</label>
+      <textarea id="userInput" rows="1" placeholder="Cuéntame qué pasa..." enterkeyhint="send" aria-label="Mensaje para Pau"></textarea>
       <button type="submit" class="send-button" aria-label="Enviar">➤</button>
     </form>
   </div>
@@ -77,7 +78,8 @@
     <div class="sheet-handle"></div>
     <h2>Opciones</h2>
     <div class="menu-list">
-      <button class="menu-item" id="exportBtn">📤 Exportar conversación</button>
+      <button class="menu-item" id="exportBtn">📤 Exportar conversación JSON</button>
+      <button class="menu-item" id="exportTxtBtn">🧾 Exportar bitácora TXT</button>
       <button class="menu-item danger" id="clearBtn">🧹 Borrar conversación</button>
     </div>
     <p class="small-print muted">Pau no es terapeuta ni reemplaza atención profesional o de emergencia. Todo queda guardado solo en este navegador: sin servidores, sin cuentas.</p>
