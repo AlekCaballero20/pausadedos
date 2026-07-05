@@ -1,10 +1,12 @@
-const CACHE_NAME = "pausa-de-dos-v3-0";
+const CACHE_NAME = "pausa-de-dos-v3-4";
 const ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./assets/css/styles.css",
   "./assets/js/knowledge-base.js",
+  "./assets/js/structured-knowledge.js",
+  "./assets/js/conversation-engine.js",
   "./assets/js/app.js"
 ];
 

@@ -38,6 +38,7 @@
         </div>
       </div>
       <div class="top-actions">
+        <span class="private-badge" id="privateBadge" hidden>🔒 Privado</span>
         <button class="icon-button" id="heatBtn" aria-label="Termómetro emocional" title="¿Cómo estás?">🌡️</button>
         <button class="icon-button" id="openSafetyBtn" aria-label="Rutas de ayuda" title="Rutas de ayuda">🆘</button>
         <button class="icon-button" id="menuBtn" aria-label="Más opciones" title="Más opciones">⋯</button>
@@ -50,6 +51,12 @@
       <input id="heatRange" type="range" min="1" max="5" value="3" />
       <p id="heatLabel" class="heat-label">3 · Hay tensión 😬</p>
     </section>
+
+    <aside class="privacy-note" id="privacyNote">
+      <span>Esta app puede guardar la conversación en este dispositivo. Si compartes este celular o computador, puedes activar modo privado.</span>
+      <button type="button" id="privacyNoteBtn">Activar</button>
+      <button type="button" id="dismissPrivacyNote" aria-label="Cerrar aviso">×</button>
+    </aside>
 
     <!-- Conversación -->
     <main class="messages" id="messages" aria-live="polite" aria-label="Conversación con Pau"></main>
@@ -78,11 +85,33 @@
     <div class="sheet-handle"></div>
     <h2>Opciones</h2>
     <div class="menu-list">
+      <button class="menu-item" id="profileBtn">👥 Personalizar nombres</button>
+      <button class="menu-item" id="privateModeBtn" role="switch" aria-checked="false">🔓 Activar modo privado</button>
       <button class="menu-item" id="exportBtn">📤 Exportar conversación JSON</button>
       <button class="menu-item" id="exportTxtBtn">🧾 Exportar bitácora TXT</button>
-      <button class="menu-item danger" id="clearBtn">🧹 Borrar conversación</button>
+      <button class="menu-item danger" id="clearBtn">🧹 Borrar todos mis datos</button>
     </div>
     <p class="small-print muted">Pau no es terapeuta ni reemplaza atención profesional o de emergencia. Todo queda guardado solo en este navegador: sin servidores, sin cuentas.</p>
+  </dialog>
+
+  <dialog id="profileDialog" class="modal">
+    <div class="modal-header">
+      <h2>Personalizar conversación</h2>
+      <button id="closeProfileBtn" class="icon-button" type="button" aria-label="Cerrar">×</button>
+    </div>
+    <form class="modal-body profile-form" id="profileForm">
+      <p id="profileIntro">Es opcional. Pau usará los nombres con moderación para que la conversación se sienta más cercana.</p>
+      <label for="userNameInput">Tu nombre</label>
+      <input id="userNameInput" name="userName" maxlength="18" autocomplete="name" placeholder="Ej. Alek" />
+      <label for="partnerNameInput">Nombre de tu pareja</label>
+      <input id="partnerNameInput" name="partnerName" maxlength="18" autocomplete="off" placeholder="Ej. Cata" />
+      <p class="profile-privacy" id="profilePrivacyText"></p>
+      <div class="profile-actions">
+        <button class="menu-item" type="button" id="skipProfileBtn" hidden>Ahora no</button>
+        <button class="menu-item danger" type="button" id="clearNamesBtn">Borrar nombres</button>
+        <button class="profile-save" type="submit">Guardar</button>
+      </div>
+    </form>
   </dialog>
 
   <!-- Rutas de ayuda -->
@@ -123,6 +152,8 @@
   </template>
 
   <script src="assets/js/knowledge-base.js"></script>
+  <script src="assets/js/structured-knowledge.js"></script>
+  <script src="assets/js/conversation-engine.js"></script>
   <script src="assets/js/app.js"></script>
   <script>
     if ("serviceWorker" in navigator) {

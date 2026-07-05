@@ -607,6 +607,8 @@ window.COUPLES_KB = {
         { key: "necesidadB", ask: "Necesidad de la Persona B: ¿qué intenta proteger?" },
         { key: "conducta", ask: "¿Qué conducta observable esperan? Algo que se pueda ver o medir, no 'ser más considerado', que suena precioso y sirve poquito." },
         { key: "responsable", ask: "¿Quién hace qué? Puede ser una persona o ambos con acciones distintas." },
+        { key: "momento", ask: "¿Cuándo o con qué frecuencia debe ocurrir esa conducta?" },
+        { key: "alternativa", ask: "Si no se puede cumplir, ¿cómo y con cuánto tiempo se avisará?" },
         { key: "revision", ask: "¿Cuándo revisan si funcionó? Ejemplo: domingo en la noche, en 7 días, después del evento." }
       ],
       steps: [

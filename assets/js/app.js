@@ -1,5 +1,6 @@
 (function () {
   const KB = window.COUPLES_KB;
+  const Engine = window.PAUSA_ENGINE;
   const els = {
     messages: document.getElementById("messages"),
     template: document.getElementById("messageTemplate"),
@@ -25,16 +26,38 @@
     rightEye: document.getElementById("rightEye"),
     mouth: document.getElementById("mouth"),
     avatarAura: document.getElementById("avatarAura"),
-    avatarStatus: document.getElementById("avatarStatus")
+    avatarStatus: document.getElementById("avatarStatus"),
+    privateModeBtn: document.getElementById("privateModeBtn"),
+    privateBadge: document.getElementById("privateBadge"),
+    privacyNote: document.getElementById("privacyNote"),
+    privacyNoteBtn: document.getElementById("privacyNoteBtn"),
+    dismissPrivacyNote: document.getElementById("dismissPrivacyNote")
+    ,profileBtn: document.getElementById("profileBtn"),
+    profileDialog: document.getElementById("profileDialog"),
+    closeProfileBtn: document.getElementById("closeProfileBtn"),
+    profileForm: document.getElementById("profileForm"),
+    userNameInput: document.getElementById("userNameInput"),
+    partnerNameInput: document.getElementById("partnerNameInput"),
+    clearNamesBtn: document.getElementById("clearNamesBtn"),
+    profilePrivacyText: document.getElementById("profilePrivacyText"),
+    profileIntro: document.getElementById("profileIntro"),
+    skipProfileBtn: document.getElementById("skipProfileBtn")
   };
 
   const STORAGE_KEY = "pausaDeDos.history.v2";
+  const PRIVATE_KEY = "pausaDeDos.privateMode.v1";
+  const ONBOARDING_KEY = "pausaDeDos.onboarding.v1";
+  const APP_STORAGE_KEYS = [STORAGE_KEY, "pausaDeDos.history.v1", "pausaDeDos.context.v1",
+    "pausaDeDos.repairLog.v1", "pausaDeDos.lastSeen", "pausaDeDos.userName.v1",
+    PRIVATE_KEY, ONBOARDING_KEY, "pausaDeDos.privacyNotice.v1"];
+  let privateMode = localStorage.getItem(PRIVATE_KEY) === "true";
   let history = loadHistory();
   let lastIntent = null; // para "ver pasos" / "frase lista"
   let activeFlow = null;
   let conversationContext = loadConversationContext();
   let repairLog = loadRepairLog();
   let busy = false;
+  let onboardingPending = false;
 
   /* ---------- Avatar ---------- */
 
@@ -143,6 +166,11 @@
     return div.innerHTML;
   }
 
+  function escapeAttr(text) {
+    return String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
   function listHTML(items) {
     return `<ol>${items.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ol>`;
   }
@@ -208,6 +236,7 @@
   }
 
   function saveHistory() {
+    if (privateMode) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(-120)));
   }
 
@@ -220,6 +249,7 @@
   }
 
   function saveRepairLog() {
+    if (privateMode) return;
     localStorage.setItem("pausaDeDos.repairLog.v1", JSON.stringify(repairLog.slice(-80)));
   }
 
@@ -233,10 +263,12 @@
   }
 
   function saveConversationContext() {
+    if (privateMode) return;
     localStorage.setItem("pausaDeDos.context.v1", JSON.stringify(conversationContext));
   }
 
   function rememberRepair(entry) {
+    if (privateMode) return;
     repairLog.push({ ...entry, createdAt: new Date().toISOString(), heat: els.heatRange.value });
     saveRepairLog();
   }
@@ -253,6 +285,7 @@
 
   // Al volver, retoma el último acuerdo si pasó más de medio día desde la última visita.
   function maybeFollowUp() {
+    if (privateMode) return;
     const last = repairLog[repairLog.length - 1];
     const lastSeen = Number(localStorage.getItem("pausaDeDos.lastSeen") || 0);
     const now = Date.now();
@@ -341,10 +374,10 @@
     }
 
     if (flowState.type === "concreteAgreement") {
-      const agreement = `Cuando ocurra ${a.situacion || "esta situación"}, ${a.responsable || "la persona responsable"} hará ${a.conducta || "la acción acordada"}. Esto cuida la necesidad de A: ${a.necesidadA || "pendiente"}, y de B: ${a.necesidadB || "pendiente"}. Lo revisamos ${a.revision || "en una fecha acordada"}.`;
+      const agreement = `Cuando ocurra ${a.situacion || "esta situación"}, ${a.responsable || "la persona responsable"} hará ${a.conducta || "la acción acordada"} ${a.momento || "en el momento acordado"}. Si no puede, avisará ${a.alternativa || "tan pronto como sea posible"}. Revisamos este acuerdo ${a.revision || "en una fecha acordada"}. Si no funciona, lo ajustamos sin culpar.`;
       rememberRepair({ type: "Acuerdo concreto", summary: a.situacion || "", agreement });
       return [
-        { html: fieldCard("Acuerdo concreto", [["Situación", a.situacion], ["Necesidad A", a.necesidadA], ["Necesidad B", a.necesidadB], ["Conducta esperada", a.conducta], ["Responsable", a.responsable], ["Revisión", a.revision]]) },
+        { html: fieldCard("Acuerdo concreto", [["Situación", a.situacion], ["Necesidad A", a.necesidadA], ["Necesidad B", a.necesidadB], ["Conducta esperada", a.conducta], ["Responsable", a.responsable], ["Momento", a.momento], ["Si no se puede", a.alternativa], ["Revisión", a.revision]]) },
         { html: `<div class="response-card phrase"><strong>Texto listo</strong><p>“${escapeHTML(agreement)}”</p><button class="copy-button" type="button" data-copy="${escapeHTML(agreement)}">📋 Copiar</button></div>` }
       ];
     }
@@ -458,9 +491,90 @@
     return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
   }
 
+  function validatedName(raw) {
+    const value = String(raw || "").trim();
+    if (!value) return "";
+    return Engine.extractPresentedName(`Soy ${value}`);
+  }
+
+  function openProfile(options = {}) {
+    onboardingPending = Boolean(options.onboarding);
+    els.userNameInput.value = conversationContext.userName || "";
+    els.partnerNameInput.value = conversationContext.partnerName || "";
+    els.profileIntro.textContent = onboardingPending
+      ? "Antes de empezar, ¿cómo se llaman? Pau usará los nombres con moderación para acompañar mejor la conversación."
+      : "Es opcional. Pau usará los nombres con moderación para que la conversación se sienta más cercana.";
+    els.skipProfileBtn.hidden = !onboardingPending;
+    els.clearNamesBtn.hidden = onboardingPending;
+    els.closeProfileBtn.hidden = onboardingPending;
+    els.profilePrivacyText.textContent = privateMode
+      ? "Modo privado activo: los nombres se usarán solo durante esta sesión."
+      : "Los nombres se guardarán únicamente en este dispositivo.";
+    if (els.menuSheet.open) els.menuSheet.close();
+    els.profileDialog.showModal();
+  }
+
+  function saveProfile(event) {
+    event.preventDefault();
+    const userName = validatedName(els.userNameInput.value);
+    const partnerName = validatedName(els.partnerNameInput.value);
+    if (els.userNameInput.value.trim() && !userName) {
+      els.userNameInput.setCustomValidity("Escribe solo un nombre corto.");
+      els.userNameInput.reportValidity();
+      return;
+    }
+    if (els.partnerNameInput.value.trim() && !partnerName) {
+      els.partnerNameInput.setCustomValidity("Escribe solo un nombre corto.");
+      els.partnerNameInput.reportValidity();
+      return;
+    }
+    els.userNameInput.setCustomValidity("");
+    els.partnerNameInput.setCustomValidity("");
+    conversationContext.userName = userName;
+    conversationContext.partnerName = partnerName;
+    saveConversationContext();
+    if (!privateMode) localStorage.setItem(ONBOARDING_KEY, "completed");
+    els.profileDialog.close();
+    const wasOnboarding = onboardingPending;
+    onboardingPending = false;
+    const greeting = userName ? `${userName}, listo.` : "Listo.";
+    const detail = partnerName
+      ? `Tendré presente que tu pareja se llama ${partnerName}, sin meter los nombres a la fuerza en cada respuesta.`
+      : "Puedes volver a editar los nombres cuando quieras desde Opciones.";
+    if (wasOnboarding && history.length) {
+      restoreOrStart();
+      botSay([
+        { text: userName ? `${userName}, guardé los nombres.` : "Guardé la personalización." },
+        { text: partnerName ? `Tendré presente que tu pareja se llama ${partnerName}.` : "Puedes completar el nombre de tu pareja después desde Opciones." }
+      ], () => renderSuggestions());
+    } else if (wasOnboarding) {
+      botSay([
+        { text: userName ? `Hola, ${userName} 👋 Soy Pau.` : "Hola 👋 Soy Pau." },
+        { text: partnerName ? `Tendré presente que tu pareja se llama ${partnerName}. Cuéntame qué está pasando entre ustedes.` : "Cuéntame qué está pasando y qué necesitas ahora." }
+      ], () => renderSuggestions(KB.openingChips));
+    } else {
+      botSay([{ text: greeting }, { text: detail }], () => renderSuggestions());
+    }
+  }
+
+  function skipOnboarding() {
+    onboardingPending = false;
+    els.profileDialog.close();
+    restoreOrStart();
+  }
+
+  function clearNames() {
+    delete conversationContext.userName;
+    delete conversationContext.partnerName;
+    saveConversationContext();
+    els.userNameInput.value = "";
+    els.partnerNameInput.value = "";
+    els.profileDialog.close();
+    botSay([{ text: "Listo, borré ambos nombres. La conversación seguirá sin personalización." }], () => renderSuggestions());
+  }
+
   // Detecta y guarda nombres del usuario y de su pareja. Devuelve un saludo si recién se presentó.
   function detectNames(text) {
-    const clean = normalize(text);
     let learnedUser = false;
 
     const partnerMatch = text.match(/(?:mi pareja|mi novi[oa]|mi espos[oa]|mi marido|mi mujer|el?\s|ella\s)?\s*se llama\s+([A-Za-zÁÉÍÓÚáéíóúñÑ]+)/i);
@@ -469,9 +583,9 @@
       if (name) { conversationContext.partnerName = name; saveConversationContext(); }
     }
 
-    const userMatch = text.match(/(?:me llamo|mi nombre es|soy)\s+([A-Za-zÁÉÍÓÚáéíóúñÑ]+)/i);
-    if (userMatch && !/pareja|novi|espos|marido|mujer|el que|la que/i.test(text)) {
-      const name = cleanName(userMatch[1]);
+    const presentedName = Engine.extractPresentedName(text);
+    if (presentedName) {
+      const name = cleanName(presentedName);
       if (name && name !== conversationContext.userName) {
         conversationContext.userName = name;
         saveConversationContext();
@@ -494,7 +608,7 @@
   }
 
   function hasCrisis(clean) {
-    return KB.crisis.keywords.some(keyword => clean.includes(normalize(keyword)));
+    return Engine.detectRisk(clean).level !== "none";
   }
 
   function detectAbsolutes(clean) {
@@ -595,6 +709,7 @@
 
   function groundedOpening(moment, intent) {
     const opener = [];
+    const userPrefix = conversationContext.userName ? `${conversationContext.userName}, ` : "";
     if (moment.heat >= 5) {
       opener.push({ text: `Esto suena demasiado cargado para resolverlo en caliente. Primero bajemos intensidad; después sí miramos el tema.` });
       return opener;
@@ -604,7 +719,7 @@
       opener.push({ text: `Vengo siguiendo el hilo: antes estábamos en "${conversationContext.lastTopic}" y ahora aparece esto: "${moment.topic}".` });
     } else {
       opener.push({ text: pick([
-        `Lo que entiendo de tu caso es esto: "${moment.topic}".`,
+        `${userPrefix}lo que entiendo de tu caso es esto: "${moment.topic}".`,
         `A ver si te sigo bien: "${moment.topic}".`,
         `Te leo. Lo que capto es: "${moment.topic}".`
       ]) });
@@ -632,7 +747,8 @@
   }
 
   function actionQuestion(moment) {
-    if (moment.task === "armar una respuesta") return "Pégame la frase cruda o dime exactamente qué quieres decir, y te la devuelvo en versión cuidadosa, clara y firme.";
+    const partner = conversationContext.partnerName ? ` a ${conversationContext.partnerName}` : "";
+    if (moment.task === "armar una respuesta") return `Pégame la frase cruda o dime exactamente qué quieres decir${partner}, y te la devuelvo en versión cuidadosa, clara y firme.`;
     if (moment.task === "bajar la intensidad") return "Antes de hablar con tu pareja: ¿quieres una pausa guiada de 2 minutos o una frase corta para pedir espacio sin sonar a abandono?";
     if (moment.task === "convertirlo en un acuerdo") return "Para volverlo acuerdo necesito una conducta observable: ¿qué tendría que pasar distinto la próxima vez?";
     if (moment.task === "reparar el daño") return "Para reparar bien: ¿qué parte sí reconoces como tuya y qué impacto tuvo en la otra persona?";
@@ -692,6 +808,8 @@
   function respond(text) {
     const heat = Number(els.heatRange.value);
 
+    const risk = Engine.detectRisk(text);
+    if (risk.level !== "none") return handleRisk(risk);
     if (startFlowFromText(text)) return;
 
     // La seguridad siempre primero: una crisis nunca se trata como small talk.
@@ -733,8 +851,9 @@
     }
 
     const intent = result.data;
+    const previousContext = { ...conversationContext };
+    const analysis = Engine.analyzeUserMessage(text, previousContext);
     const moment = extractMoment(text, intent, heat);
-    updateConversationContext(moment, intent);
     lastIntent = { ...intent, moreBubbles: (intent.bubbles || []).slice(moment.directAsk ? 2 : 1) };
 
     const parts = [
@@ -743,7 +862,28 @@
       { text: actionQuestion(moment) }
     ];
 
+    updateConversationContext(moment, intent);
+    conversationContext.lastTopic = analysis.topic;
+    conversationContext.lastEmotion = analysis.emotion;
+    conversationContext.lastIntent = analysis.intent;
+    saveConversationContext();
     botSay(parts, () => renderSuggestions(contextChips(lastIntent, moment)));
+  }
+
+  function handleRisk(risk) {
+    activeFlow = null;
+    updateAvatar(5);
+    const crisis = risk.level === "crisis";
+    botSay([
+      { text: crisis ? "Primero tu seguridad. La conversación puede esperar." : "Esto puede ser una señal de control o violencia. Conviene tomarlo en serio.", tone: "danger" },
+      { text: crisis ? "Si hay peligro inmediato, aléjate si hacerlo es seguro y contacta a emergencias o a una persona de confianza. En Colombia puedes llamar al 123." : "No tienes que resolverlo conversando a solas. Busca apoyo de alguien de confianza y prepara una salida segura si la necesitas.", tone: "danger" },
+      { text: "Si alguien puede revisar este dispositivo, puedes activar el modo privado o borrar todos los datos desde Opciones.", tone: "danger" }
+    ], () => renderSuggestions([
+      { label: "🆘 Ver rutas de ayuda", action: "safety" },
+      { label: "🔒 Activar modo privado", action: "privateMode" },
+      { label: "🧹 Borrar todos mis datos", action: "clearAll" }
+    ]));
+    return true;
   }
 
   function showSteps() {
@@ -776,9 +916,8 @@
     autosizeTextarea();
     els.suggestionRow.innerHTML = "";
 
-    const clean = normalize(text);
-    if (hasCrisis(clean)) updateAvatar(5);
-
+    const risk = Engine.detectRisk(text);
+    if (risk.level !== "none") return handleRisk(risk);
     if (continueFlow(text)) return;
     respond(text);
   }
@@ -787,7 +926,10 @@
     if (busy) return;
     addMessage("user", `<p>${escapeHTML(prompt)}</p>`);
     els.suggestionRow.innerHTML = "";
-    if (!startFlowFromText(prompt)) respond(prompt);
+    const risk = Engine.detectRisk(prompt);
+    if (risk.level !== "none") return handleRisk(risk);
+    if (activeFlow && continueFlow(prompt)) return;
+    respond(prompt);
   }
 
   function autosizeTextarea() {
@@ -843,17 +985,41 @@
   }
 
   function clearHistory() {
-    const ok = confirm("¿Borrar la conversación? Solo está guardada en este navegador.");
+    const ok = confirm("¿Borrar toda la conversación, contexto, bitácora y preferencias guardadas en este dispositivo?");
     if (!ok) return;
     history = [];
     lastIntent = null;
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem("pausaDeDos.context.v1");
+    APP_STORAGE_KEYS.forEach(key => localStorage.removeItem(key));
     conversationContext = {};
+    repairLog = [];
+    activeFlow = null;
+    privateMode = false;
+    updatePrivateUI();
     els.messages.innerHTML = "";
     els.menuSheet.close();
     restoreOrStart();
     updateAvatar(Number(els.heatRange.value));
+  }
+
+  function setPrivateMode(enabled) {
+    privateMode = Boolean(enabled);
+    if (privateMode) {
+      history = [];
+      repairLog = [];
+      conversationContext = {};
+      APP_STORAGE_KEYS.filter(key => key !== PRIVATE_KEY).forEach(key => localStorage.removeItem(key));
+      localStorage.setItem(PRIVATE_KEY, "true");
+    } else {
+      localStorage.removeItem(PRIVATE_KEY);
+    }
+    updatePrivateUI();
+  }
+
+  function updatePrivateUI() {
+    document.body.classList.toggle("private-mode", privateMode);
+    els.privateBadge.hidden = !privateMode;
+    els.privateModeBtn.setAttribute("aria-checked", String(privateMode));
+    els.privateModeBtn.textContent = privateMode ? "🔒 Desactivar modo privado" : "🔓 Activar modo privado";
   }
 
   /* ---------- Eventos ---------- */
@@ -889,6 +1055,8 @@
       if (action === "phrase") { showPhrase(); return; }
       if (action === "more") { showMore(); return; }
       if (action === "safety") { els.safetyDialog.showModal(); return; }
+      if (action === "privateMode") { setPrivateMode(true); return; }
+      if (action === "clearAll") { clearHistory(); return; }
       if (action === "cancelFlow") { activeFlow = null; botSay([{ text: "Listo, cancelé el flujo. Volvemos al modo conversación." }], () => renderSuggestions()); return; }
       if (action === "exportTxt") { exportTextLog(); return; }
 
@@ -928,9 +1096,17 @@
 
     els.modesBtn.addEventListener("click", () => els.modesSheet.showModal());
     els.menuBtn.addEventListener("click", () => els.menuSheet.showModal());
+    els.profileBtn.addEventListener("click", openProfile);
+    els.closeProfileBtn.addEventListener("click", () => els.profileDialog.close());
+    els.profileForm.addEventListener("submit", saveProfile);
+    els.clearNamesBtn.addEventListener("click", clearNames);
+    els.skipProfileBtn.addEventListener("click", skipOnboarding);
+    [els.userNameInput, els.partnerNameInput].forEach(input => {
+      input.addEventListener("input", () => input.setCustomValidity(""));
+    });
 
     // Cerrar sheets/modal al tocar el fondo
-    [els.modesSheet, els.menuSheet, els.safetyDialog].forEach(dialog => {
+    [els.modesSheet, els.menuSheet, els.safetyDialog, els.profileDialog].forEach(dialog => {
       dialog.addEventListener("click", event => {
         if (event.target === dialog) dialog.close();
       });
@@ -941,14 +1117,24 @@
     els.exportBtn.addEventListener("click", exportHistory);
     if (els.exportTxtBtn) els.exportTxtBtn.addEventListener("click", exportTextLog);
     els.clearBtn.addEventListener("click", clearHistory);
+    els.privateModeBtn.addEventListener("click", () => setPrivateMode(!privateMode));
+    els.privacyNoteBtn.addEventListener("click", () => { setPrivateMode(true); els.privacyNote.hidden = true; });
+    els.dismissPrivacyNote.addEventListener("click", () => {
+      els.privacyNote.hidden = true;
+      if (!privateMode) localStorage.setItem("pausaDeDos.privacyNotice.v1", "dismissed");
+    });
   }
 
   function init() {
     renderModes();
+    updatePrivateUI();
+    els.privacyNote.hidden = privateMode || localStorage.getItem("pausaDeDos.privacyNotice.v1") === "dismissed";
     updateAvatar(Number(els.heatRange.value));
-    restoreOrStart();
     bindEvents();
     els.heatLabel.textContent = KB.heatLabels[els.heatRange.value];
+    const namesMissing = !conversationContext.userName || !conversationContext.partnerName;
+    if (namesMissing) openProfile({ onboarding: true });
+    else restoreOrStart();
   }
 
   init();
