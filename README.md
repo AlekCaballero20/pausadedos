@@ -122,3 +122,7 @@ Esta versión mejora el problema de que Pau sonaba como un menú de respuestas. 
 - En flujos guiados, responde con una validación breve antes de pasar a la siguiente pregunta.
 
 Esto sigue siendo un motor local sin IA real. Por eso no “entiende” como un modelo generativo, pero se siente menos rígido porque ya no responde solo por palabra clave: primero intenta situar el momento.
+
+## Motor de formulación relacional
+
+El análisis determinista vive en `assets/js/conversation-engine.js`; `app.js` solo presenta la conversación. El motor usa `structured-knowledge.js` como catálogo compartido de temas, señales, recursos y riesgo, y separa datos dichos por la persona de hipótesis humildes. Prioriza: seguridad, activación, objetivo de escucha, escena, patrón y herramienta. No diagnostica ni decide quién tiene razón.

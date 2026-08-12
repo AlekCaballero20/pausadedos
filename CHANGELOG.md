@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-11
+
+- Motor: `conversation-engine.js` es la fuente única para análisis, activación, riesgo, hecho/interpretación, ciclo, DEEP y recomendación.
+- Seguridad: reglas y recursos centralizados en `structured-knowledge.js`; se evita mediar cuando hay riesgo.
+- UX: nuevos accesos para ciclo, perspectiva, comprensión y estrés; las respuestas empiezan con reflejo breve y una pregunta.
+- Pruebas: se amplió la suite de seguridad y formulación.
+
 ## 2026-07-04
 
 - Personalización: formulario opcional para guardar, editar o borrar el nombre de la persona y su pareja; en modo privado solo viven durante la sesión.

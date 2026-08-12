@@ -12,6 +12,8 @@ En Dos voces, Acuerdo o Mensaje reparador, cualquier riesgo debe cancelar el flu
 
 La suite cubre puntualidad, escucha, visto, traducción cuidadosa, desahogo, culpa y disculpa. Cada caso verifica `risk`, `intent` y `topic`; visualmente debe producir 2–4 burbujas, hipótesis no categóricas y acciones contextuales.
 
+La cobertura estructurada añade control digital, violencia física, amenazas de suicidio coercitivas, armas sin amenaza, hecho frente a interpretación, ciclo perseguidor-distanciador, estrés externo, escucha sin consejos, reparación y baja confianza.
+
 ## Privacidad y HTML
 
 - Activar modo privado, conversar y recargar: no debe restaurar conversación, contexto ni bitácora.

@@ -311,7 +311,13 @@
   /* ---------- Chips y modos ---------- */
 
   function renderModes() {
-    els.modeGrid.innerHTML = KB.modes.map(mode => `
+    const modes = [...KB.modes, ...[
+      { emoji: "🔄", title: "Mapear nuestro ciclo", desc: "Entender el baile que se repite", prompt: "Quiero mapear nuestro ciclo: qué lo dispara, qué hago yo y qué pasa después." },
+      { emoji: "🎬", title: "Verlo desde afuera", desc: "Mirar el problema sin bandos", prompt: "Quiero mirar el problema desde afuera." },
+      { emoji: "💛", title: "Sentirme entendido/a", desc: "Escuchar antes de resolver", prompt: "Necesito sentirme entendido/a antes de hablar de soluciones." },
+      { emoji: "🌧️", title: "Nosotros contra el estrés", desc: "Separar estrés externo y culpa", prompt: "Queremos mirar el estrés externo como equipo." }
+    ]];
+    els.modeGrid.innerHTML = modes.map(mode => `
       <button class="mode-button" type="button" data-prompt="${escapeHTML(mode.prompt)}">
         <span class="mode-emoji">${mode.emoji}</span>
         <span><span class="mode-title">${escapeHTML(mode.title)}</span><span class="mode-desc">${escapeHTML(mode.desc)}</span></span>
@@ -607,46 +613,6 @@
     }, 0) + intent.priority / 100;
   }
 
-  function hasCrisis(clean) {
-    return Engine.detectRisk(clean).level !== "none";
-  }
-
-  function detectAbsolutes(clean) {
-    return ["siempre", "nunca", "todo", "nada", "jamas"].filter(word => clean.includes(word));
-  }
-
-  function detectFeeling(clean) {
-    return KB.feelingWords.find(word => clean.includes(normalize(word))) || "";
-  }
-
-  function chooseIntent(text, heat) {
-    const clean = normalize(text);
-    if (hasCrisis(clean)) return { type: "crisis", data: KB.crisis.response };
-
-    const ranked = KB.intents
-      .map(intent => ({ intent, score: scoreIntent(intent, clean) }))
-      .sort((a, b) => b.score - a.score);
-
-    let chosen = ranked[0]?.score > 1.5 ? ranked[0].intent : KB.fallback;
-
-    if (Number(heat) >= 5 && chosen.id !== "repair" && chosen.id !== "calmGuide") {
-      chosen = KB.intents.find(intent => intent.id === "pause") || chosen;
-    }
-
-    return { type: "intent", data: chosen };
-  }
-
-  // Pequeña validación empática previa, basada en lo que escribió la persona.
-  function makeReflection(text) {
-    const clean = normalize(text);
-    const feeling = detectFeeling(clean);
-    const absolutes = detectAbsolutes(clean);
-    const notes = [];
-    if (feeling) notes.push(`Leo bastante ${feeling} en lo que escribes, y tiene sentido sentirla.`);
-    if (absolutes.length) notes.push(`Ojo con palabras como ${absolutes.map(w => `"${w}"`).join(", ")}: suelen subir la defensa del otro lado y bajar la escucha.`);
-    return notes;
-  }
-
   function clampText(text, max = 110) {
     const clean = (text || "").replace(/\s+/g, " ").trim();
     if (clean.length <= max) return clean;
@@ -778,11 +744,11 @@
 
   function flowAcknowledgement(text) {
     const clean = normalize(text);
-    const feeling = detectFeeling(clean);
     if (includesAny(clean, ["no sé", "no se", "ni idea", "no estoy seguro", "no estoy segura"])) {
       return "Sirve decir “no sé”. No es elegante, pero al menos es honesto. Vamos con una versión aproximada.";
     }
-    if (feeling) return `Tiene sentido que aparezca ${feeling}. Lo tomo como dato importante, no como exageración.`;
+    const analysis = Engine.analyzeUserMessage(text, conversationContext);
+    if (analysis.emotions.explicit[0]) return `Tiene sentido que aparezca ${analysis.emotions.explicit[0]}. Lo tomo como dato importante, no como exageración.`;
     if (text.length > 80) return "Gracias, eso ya da más contexto. Voy guardando lo importante.";
     return "Te sigo.";
   }
@@ -806,14 +772,12 @@
   }
 
   function respond(text) {
-    const heat = Number(els.heatRange.value);
-
-    const risk = Engine.detectRisk(text);
-    if (risk.level !== "none") return handleRisk(risk);
+    const previousContext = { ...conversationContext, activation: { selfReported: Number(els.heatRange.value) } };
+    const analysis = Engine.analyzeUserMessage(text, previousContext);
+    if (analysis.risk.level !== "none") return handleRisk(analysis.risk);
     if (startFlowFromText(text)) return;
 
-    // La seguridad siempre primero: una crisis nunca se trata como small talk.
-    if (!hasCrisis(normalize(text))) {
+    {
       const learnedUser = detectNames(text);
       const small = detectSmalltalk(text);
 
@@ -830,44 +794,25 @@
       if (small) { handleSmalltalk(small); return; }
     }
 
-    const result = chooseIntent(text, heat);
-
-    if (result.type === "crisis") {
-      const data = result.data;
-      lastIntent = data;
-      const parts = [
-        { html: `<strong>${escapeHTML(data.title)}</strong>`, tone: "danger", text: data.title },
-        ...data.bubbles.map(b => ({ text: b, tone: "danger" })),
-        { html: `<div class="response-card danger"><strong>Ahora mismo</strong>${listHTML(data.steps)}</div>`, text: data.steps.join(" ") }
-      ];
-      botSay(parts, () => {
-        renderSuggestions([
-          { label: "🆘 Ver rutas de ayuda", action: "safety" },
-          "Necesito estar a salvo ahora",
-          "Quiero escribirle a alguien de confianza"
-        ]);
-      });
-      return;
-    }
-
-    const intent = result.data;
-    const previousContext = { ...conversationContext };
-    const analysis = Engine.analyzeUserMessage(text, previousContext);
-    const moment = extractMoment(text, intent, heat);
-    lastIntent = { ...intent, moreBubbles: (intent.bubbles || []).slice(moment.directAsk ? 2 : 1) };
-
-    const parts = [
-      ...groundedOpening(moment, intent),
-      ...progressiveIntentBubbles(intent, moment),
-      { text: actionQuestion(moment) }
-    ];
-
-    updateConversationContext(moment, intent);
-    conversationContext.lastTopic = analysis.topic;
-    conversationContext.lastEmotion = analysis.emotion;
+    const topic = analysis.topic === "unknown" ? "esto" : analysis.topic.replaceAll("_", " ");
+    const explicit = analysis.emotions.explicit[0];
+    const reflection = explicit ? `Suena a que esto te pegó fuerte; aparece ${explicit}.` : "Te leo. No quiero completar la historia por ti.";
+    let question = "¿Qué pasó en una escena concreta, justo antes de que esto se sintiera así?";
+    if (analysis.recommendedIntervention === "LISTEN") question = "¿Qué fue lo más pesado de esta escena?";
+    if (analysis.recommendedIntervention === "HIGH_ACTIVATION") question = "¿Prefieres pedir una pausa con hora de regreso o bajar primero un poco la activación?";
+    if (analysis.recommendedIntervention === "DYADIC_COPING") question = "¿Esto nació entre ustedes o hay algo de afuera dejándoles menos paciencia?";
+    if (analysis.recommendedIntervention === "MAP_CYCLE") question = "Cuando tú haces eso para protegerte, ¿qué suele hacer la otra persona después?";
+    if (analysis.recommendedIntervention === "REPAIR") question = "¿Qué impacto concreto reconoces y qué harías diferente, sin justificarlo primero?";
+    if (analysis.recommendedIntervention === "AGREEMENT") question = "¿Cuál sería una acción observable, voluntaria y realista para la próxima vez?";
+    const parts = [{ text: reflection }, { text: analysis.meaning.interpretation ? "Podemos distinguir el hecho de lo que significó para ti, sin decir que esa interpretación sea absurda." : `Antes de buscar solución, ubiquemos el patrón alrededor de ${topic}.` }, { text: question }];
+    conversationContext.confirmed = conversationContext.confirmed || {};
+    if (analysis.topic !== "unknown") conversationContext.confirmed.topic = analysis.topic;
+    if (analysis.meaning.interpretation) conversationContext.confirmed.interpretation = analysis.meaning.interpretation;
+    conversationContext.hypotheses = { possiblePrimary: analysis.emotions.possiblePrimary, needs: analysis.needs.hypotheses };
+    conversationContext.activation = analysis.activation;
     conversationContext.lastIntent = analysis.intent;
     saveConversationContext();
-    botSay(parts, () => renderSuggestions(contextChips(lastIntent, moment)));
+    botSay(parts, () => renderSuggestions(analysis.userGoal === "vent" ? ["Quiero contar qué pasó", "Ahora sí quiero una idea"] : KB.suggestions));
   }
 
   function handleRisk(risk) {
@@ -876,8 +821,8 @@
     const crisis = risk.level === "crisis";
     botSay([
       { text: crisis ? "Primero tu seguridad. La conversación puede esperar." : "Esto puede ser una señal de control o violencia. Conviene tomarlo en serio.", tone: "danger" },
-      { text: crisis ? "Si hay peligro inmediato, aléjate si hacerlo es seguro y contacta a emergencias o a una persona de confianza. En Colombia puedes llamar al 123." : "No tienes que resolverlo conversando a solas. Busca apoyo de alguien de confianza y prepara una salida segura si la necesitas.", tone: "danger" },
-      { text: "Si alguien puede revisar este dispositivo, puedes activar el modo privado o borrar todos los datos desde Opciones.", tone: "danger" }
+      { text: crisis ? "Si hay peligro inmediato, aléjate solo si hacerlo no aumenta el riesgo y llama al 123. Para apoyo emocional en Bogotá: Línea 106 o WhatsApp 300 754 8933." : "No tienes que resolverlo conversando a solas. Busca apoyo de alguien de confianza si hacerlo es seguro. No recomiendo confrontar ni negociar ahora.", tone: "danger" },
+      { text: "Si este dispositivo puede estar vigilado, usa modo privado o borra datos solo si eso no aumenta el riesgo. Si guardar información te sirve para una ruta de apoyo, hazlo desde un lugar o dispositivo seguro.", tone: "danger" }
     ], () => renderSuggestions([
       { label: "🆘 Ver rutas de ayuda", action: "safety" },
       { label: "🔒 Activar modo privado", action: "privateMode" },

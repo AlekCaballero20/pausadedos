@@ -26,9 +26,10 @@ En esos casos, la prioridad no es “comunicarse mejor”. La prioridad es estar
 
 Revisa estas rutas periódicamente, porque los números y horarios pueden cambiar. La vida real, como siempre, actualizando bugs sin avisar.
 
+Los recursos se centralizan técnicamente en `PAUSA_KNOWLEDGE.supportResources`, con región y fecha de verificación (2026-08-11). Pau selecciona rutas según riesgo; no trata violencia, coerción, control o miedo como un conflicto para mediar. Si el dispositivo puede estar vigilado, borrar datos o guardar información solo debe hacerse cuando no incremente el riesgo.
+
 ## Frase de límite del producto
 
 Puedes usar esta frase en la pantalla inicial, términos o documentación:
 
 > Pausa de Dos es una herramienta de apoyo conversacional para parejas. No diagnostica, no reemplaza terapia y no debe usarse como mediador en situaciones de violencia, amenazas o riesgo. Si hay peligro inmediato, busca ayuda humana y rutas de emergencia.
-
