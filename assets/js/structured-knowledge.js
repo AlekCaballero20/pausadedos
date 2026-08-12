@@ -18,14 +18,15 @@
       chores: { label: "Carga de tareas", signals: ["tareas", "oficio", "carga mental"] },
       money: { label: "Dinero", signals: ["plata", "dinero", "gastos", "deuda"] },
       family: { label: "Familia", signals: ["familia", "suegra", "suegro"] },
-      communication: { label: "Comunicación", signals: ["escucha", "hablar", "responde", "visto"] },
+      conflict: { label: "Pelea o discusión", signals: ["pelear", "pelea", "discutimos", "discusión", "discusion", "discutir", "gritó", "grito", "gritos"] },
+      communication: { label: "Comunicación", signals: ["escucha", "hablar", "responde", "visto", "me contestó", "me contesto", "no me responde"] },
       emotional_distance: { label: "Distancia emocional", signals: ["distante", "frío", "desconectados"] },
       intimacy: { label: "Intimidad", signals: ["intimidad", "sexo", "deseo"] },
       digital_control: { label: "Celular y redes", signals: ["celular", "redes", "contraseña"] }
     },
     externalStressors: ["trabajo", "dinero", "crianza", "enfermedad", "sueño", "cansancio", "estudios", "desempleo", "familia", "mudanza", "duelo", "responsabilidades", "cuidar"],
     emotions: {
-      anger: ["rabia", "furia", "enoj", "mamado", "mamada"], sadness: ["triste", "llor", "dolor", "decepción"],
+      anger: ["rabia", "furia", "enoj", "mamado", "mamada", "gritó", "grito", "gritos"], sadness: ["triste", "llor", "dolor", "decepción"],
       fear: ["miedo", "temor", "insegur"], guilt: ["culpa", "culpable"], shame: ["vergüenza"],
       frustration: ["frustr", "harto"], loneliness: ["solo", "sola"], overwhelm: ["satur", "abrum", "agotad", "destruid"]
     },

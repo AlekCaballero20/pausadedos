@@ -796,12 +796,18 @@
 
     const topic = analysis.topic === "unknown" ? "esto" : analysis.topic.replaceAll("_", " ");
     const explicit = analysis.emotions.explicit[0];
-    const reflection = explicit ? `Suena a que esto te pegó fuerte; aparece ${explicit}.` : "Te leo. No quiero completar la historia por ti.";
+    const clean = analysis.normalizedText;
+    let reflection = explicit ? `Suena a que esto te pegó fuerte; aparece ${explicit}.` : "Te leo. No quiero completar la historia por ti.";
+    if (/acabamos de pelear|acabamos de discutir/.test(clean)) reflection = "Acaban de pelear. No voy a asumir el motivo ni poner culpas, pero sí entiendo que están en un momento sensible.";
+    if (/(ella|el|él) grito|gritos/.test(clean)) reflection = "Hubo gritos. Eso suele hacer mucho más difícil escucharse; antes de seguir, quiero ubicar qué ocurrió y cómo te impactó.";
+    if (/me dejo en visto|no me responde/.test(clean)) reflection = "La falta de respuesta te está dejando con algo abierto. Puede doler por el silencio mismo o por lo que termina significando para ti.";
+    if (/llego tarde|llegó tarde/.test(clean)) reflection = "La tardanza está sobre la mesa. Antes de concluir qué significa, quiero distinguir si dolió el retraso, la falta de aviso o sentir que tu tiempo no contó.";
     let question = "¿Qué pasó en una escena concreta, justo antes de que esto se sintiera así?";
     if (analysis.recommendedIntervention === "LISTEN") question = "¿Qué fue lo más pesado de esta escena?";
     if (analysis.recommendedIntervention === "HIGH_ACTIVATION") question = "¿Prefieres pedir una pausa con hora de regreso o bajar primero un poco la activación?";
     if (analysis.recommendedIntervention === "DYADIC_COPING") question = "¿Esto nació entre ustedes o hay algo de afuera dejándoles menos paciencia?";
     if (analysis.recommendedIntervention === "MAP_CYCLE") question = "Cuando tú haces eso para protegerte, ¿qué suele hacer la otra persona después?";
+    if (analysis.topic === "conflict" && /grito|gritos/.test(clean)) question = "¿Qué pasó justo antes del grito y qué hiciste tú después?";
     if (analysis.recommendedIntervention === "REPAIR") question = "¿Qué impacto concreto reconoces y qué harías diferente, sin justificarlo primero?";
     if (analysis.recommendedIntervention === "AGREEMENT") question = "¿Cuál sería una acción observable, voluntaria y realista para la próxima vez?";
     const parts = [{ text: reflection }, { text: analysis.meaning.interpretation ? "Podemos distinguir el hecho de lo que significó para ti, sin decir que esa interpretación sea absurda." : `Antes de buscar solución, ubiquemos el patrón alrededor de ${topic}.` }, { text: question }];
